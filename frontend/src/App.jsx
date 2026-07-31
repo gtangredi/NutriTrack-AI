@@ -1,25 +1,18 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import Login from './Login'
 
 
 function App() {
-  const [status, setStatus] = useState("")
+  const [loggedInUser, setLoggedInUser] = useState(null);
 
-  useEffect(() => {
-    axios.get('http://localhost:5000/api/health')
-      .then(response => {
-        setStatus("backend reachable")
-      })
-      .catch(error => {
-        console.error('Error fetching health status:', error)
-        setStatus('backend not reachable')
-      })
-  }, [])
+  if(!loggedInUser) {
+    return <Login onLogin={setLoggedInUser} />;
+  }
 
   return (
     <div>
       <h1>Nutritrack AI</h1>
-      <p>Backend status: {status}</p>
+      <p>Welcome, {loggedInUser}!</p>
     </div>
   )
 }
