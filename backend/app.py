@@ -31,17 +31,69 @@ def login():
 
     user = User.query.filter_by(username=username).first()
     if user and check_password_hash(user.password_hash, password):
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         return jsonify({'access_token': access_token, "username": user.username}), 200
     else:
         return jsonify({'error': 'Invalid credentials'}), 401
 
-@app.route('/api/protected', methods=['GET'])
+@app.route('/api/weight', methods=['GET', 'POST'])
 @jwt_required()
-def protected():
-    current_user_id = get_jwt_identity()
-    return jsonify({'user': 'success' })
+def weight_log():
+    user_id = get_jwt_identity()
+    if request.method == 'POST':
+        data = request.get_json()
+        weight = data.get('weight')
+        
+        new_weightlog = Weightlog(user_id=user_id, weight=weight)
+        db.session.add(new_weightlog)
+        db.session.commit()
+        return jsonify({
+            'id': new_weightlog.id, 
+            'weight': new_weightlog.weight, 
+            'date': new_weightlog.log_date.isoformat()
+        }), 201
 
+    logs = Weightlog.query.filter_by(user_id=user_id).order_by(Weightlog.log_date.desc()).all()
+    return jsonify([{
+        'id': w.id,
+        'weight': w.weight,
+        'date': w.log_date.isoformat()
+    } for w in logs]), 200
+
+@app.route('/api/workouts', methods=['GET', 'POST'])
+@jwt_required()
+def workouts():
+    user_id = get_jwt_identity()
+    if request.method == 'POST':
+        data = request.get_json()
+        workout_type = data.get('workout_type')
+        duration = data.get('duration')
+        calories_burned = data.get('calories_burned')
+        new_workout = Workout(
+            user_id=user_id,
+            workout_type=workout_type,
+            duration=duration,
+            calories_burned=calories_burned
+        )
+        db.session.add(new_workout)
+        db.session.commit()
+        return jsonify({
+            'id': new_workout.id,
+            'workout_type': new_workout.workout_type,
+            'duration': new_workout.duration,
+            'calories_burned': new_workout.calories_burned,
+            'date': new_workout.workout_date.isoformat()
+        }), 201
+
+    workouts = Workout.query.filter_by(user_id=user_id).order_by(Workout.workout_date.desc()).all()
+    return jsonify([{
+        'id': w.id,
+        'workout_type': w.workout_type,
+        'duration': w.duration,
+        'calories_burned': w.calories_burned,
+        'date': w.workout_date.isoformat()
+    } for w in workouts]), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+

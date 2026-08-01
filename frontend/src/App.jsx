@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Login from './Login'
-
+import WeightTracker from './WeightTracker'
+import WorkoutTracker from './WorkoutTracker'
+import Dashboard from './Dashboard'
 
 function App() {
   const [loggedInUser, setLoggedInUser] = useState(null);
@@ -13,6 +15,9 @@ function App() {
     <div>
       <h1>Nutritrack AI</h1>
       <p>Welcome, {loggedInUser}!</p>
+      <WeightTracker /> 
+      <WorkoutTracker />
+      <Dashboard />
     </div>
   )
 }
