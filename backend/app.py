@@ -1,4 +1,5 @@
 import os
+import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -12,6 +13,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 CORS(app)
+
+USDA_API_KEY = os.getenv('USDA_API_KEY')
 
 db.init_app(app)
 jwt = JWTManager(app)
@@ -93,6 +96,34 @@ def workouts():
         'calories_burned': w.calories_burned,
         'date': w.workout_date.isoformat()
     } for w in workouts]), 200
+
+@app.route('/api/foods/search', methods=['GET'])
+@jwt_required()
+def search_foods():
+    query = request.args.get('q')
+    if not query:
+        return jsonify({'error': 'Query parameter is required'}), 400
+
+    url = f'https://api.nal.usda.gov/fdc/v1/foods/search'
+    response = requests.get(url, params={'api_key': USDA_API_KEY, 'query': query, 'pageSize': 10})
+    
+    if response.status_code != 200:
+        return jsonify({'error': 'Failed to fetch data from USDA API'}), 500
+
+    data = response.json()
+    results = []
+    for food in data.get('foods', []):
+        nutrients = {n['nutrientNumber']: n['value'] for n in food.get('foodNutrients', []) if 'nutrientNumber' in n }
+        results.append({
+            'description': food.get('description'),
+            'fdcId': food.get('fdcId'),
+            'calories': nutrients.get('208', 0),  # Energy
+            'protein': nutrients.get('203', 0),   # Protein
+            'carbs': nutrients.get('205', 0),     # Carbohydrates
+            'fats': nutrients.get('204', 0)       # Total lipid (fat)
+        })
+
+    return jsonify(results), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
