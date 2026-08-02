@@ -1,80 +1,92 @@
-import { useState, useEffect } from "react";
-import api from "./api";
+import { useState, useEffect } from 'react';
+import api from './api';
 
 function WorkoutTracker() {
-    const [workoutType, setWorkoutType] = useState("");
-    const [duration, setDuration] = useState("");
-    const [caloriesBurned, setCaloriesBurned] = useState("");
-    const [workouts, setWorkouts] = useState([]);
-    const [error, setError] = useState("");
+  const [workoutType, setWorkoutType] = useState('');
+  const [duration, setDuration] = useState('');
+  const [caloriesBurned, setCaloriesBurned] = useState('');
+  const [workouts, setWorkouts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [error, setError] = useState('');
 
-    const fetchWorkouts = async () => {
-        try {
-            const response = await api.get("/workouts");
-            setWorkouts(response.data);
-        } catch (error) {
-            setError("Failed to fetch workouts");
-        }
-    };
+  const fetchWorkouts = async (pageNum = 1) => {
+    try {
+      const res = await api.get('/workouts', { params: { page: pageNum, per_page: 5 } });
+      setWorkouts(res.data.items);
+      setPage(res.data.page);
+      setTotalPages(res.data.total_pages);
+    } catch (err) {
+      console.log(err);
+      setError('Failed to fetch workouts');
+    }
+  };
 
-    useEffect(() => {
-        fetchWorkouts();
-    }, []);
+  useEffect(() => {
+    fetchWorkouts(1);
+  }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            await api.post("/workouts", {
-                workout_type: workoutType,
-                duration: parseFloat(duration),
-                calories_burned: parseFloat(caloriesBurned)
-            });
-            // Refresh the workouts list after adding a new one
-            fetchWorkouts();
-            // Clear the form fields
-            setWorkoutType("");
-            setDuration("");
-            setCaloriesBurned("");
-        } catch (error) {
-            setError("Failed to add workout");
-        }
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/workouts', {
+        workout_type: workoutType,
+        duration: parseInt(duration),
+        calories_burned: caloriesBurned ? parseFloat(caloriesBurned) : null
+      });
+      setWorkoutType('');
+      setDuration('');
+      setCaloriesBurned('');
+      fetchWorkouts(1);
+    } catch (err) {
+      console.log(err);
+      setError('Failed to log workout');
+    }
+  };
 
-    return (
-        <div>
-            <h2>Workout Tracker</h2>
-            {error && <p style={{ color: "red" }}>{error}</p>}
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="text"
-                    placeholder="Workout Type"
-                    value={workoutType}
-                    onChange={(e) => setWorkoutType(e.target.value)}
-                />
-                <input
-                    type="number"
-                    placeholder="Duration (minutes)"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                />
-                <input
-                    type="number"
-                    placeholder="Calories Burned"
-                    value={caloriesBurned}
-                    onChange={(e) => setCaloriesBurned(e.target.value)}
-                />
-                <button type="submit">Add Workout</button>
-            </form>
+  return (
+    <div className="card">
+      <h2>Workout Tracker</h2>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={workoutType}
+          onChange={e => setWorkoutType(e.target.value)}
+          placeholder="Workout type (e.g. Running)"
+        />
+        <input
+          type="number"
+          value={duration}
+          onChange={e => setDuration(e.target.value)}
+          placeholder="Duration (minutes)"
+        />
+        <input
+          type="number"
+          step="0.1"
+          value={caloriesBurned}
+          onChange={e => setCaloriesBurned(e.target.value)}
+          placeholder="Calories burned (optional)"
+        />
+        <button type="submit">Log Workout</button>
+      </form>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
 
-            <ul>
-                {workouts.map((workout) => (
-                    <li key={workout.id}>
-                        {new Date(workout.date).toLocaleDateString()} - {workout.workout_type}: {workout.duration} minutes, {workout.calories_burned} calories
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
+      <ul>
+        {workouts.map(w => (
+          <li key={w.id}>
+            {w.date}: {w.workout_type} — {w.duration} min
+            {w.calories_burned ? `, ${w.calories_burned} cal burned` : ''}
+          </li>
+        ))}
+      </ul>
+
+      <div className="pagination">
+        <button disabled={page <= 1} onClick={() => fetchWorkouts(page - 1)}>Prev</button>
+        <span style={{ margin: '0 1rem' }}>Page {page} of {totalPages}</span>
+        <button disabled={page >= totalPages} onClick={() => fetchWorkouts(page + 1)}>Next</button>
+      </div>
+    </div>
+  );
 }
 
 export default WorkoutTracker;

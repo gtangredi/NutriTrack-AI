@@ -1,5 +1,6 @@
 import os
 import requests
+from datetime import timedelta
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -34,7 +35,7 @@ def login():
 
     user = User.query.filter_by(username=username).first()
     if user and check_password_hash(user.password_hash, password):
-        access_token = create_access_token(identity=str(user.id))
+        access_token = create_access_token(identity=str(user.id), expires_delta=timedelta(days=7))
         return jsonify({'access_token': access_token, "username": user.username}), 200
     else:
         return jsonify({'error': 'Invalid credentials'}), 401
@@ -56,12 +57,24 @@ def weight_log():
             'date': new_weightlog.log_date.isoformat()
         }), 201
 
-    logs = Weightlog.query.filter_by(user_id=user_id).order_by(Weightlog.log_date.desc()).all()
-    return jsonify([{
-        'id': w.id,
-        'weight': w.weight,
-        'date': w.log_date.isoformat()
-    } for w in logs]), 200
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    pagination = Weightlog.query.filter_by(user_id=user_id) \
+        .order_by(Weightlog.log_date.desc()) \
+        .paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'items': [{
+            'id': w.id,
+            'weight': w.weight,
+            'date': w.log_date.isoformat()
+        } for w in pagination.items],
+        'page': pagination.page,
+        'per_page': pagination.per_page,
+        'total_pages': pagination.pages,
+        'total_items': pagination.total
+    }), 200
 
 @app.route('/api/workouts', methods=['GET', 'POST'])
 @jwt_required()
@@ -88,14 +101,26 @@ def workouts():
             'date': new_workout.workout_date.isoformat()
         }), 201
 
-    workouts = Workout.query.filter_by(user_id=user_id).order_by(Workout.workout_date.desc()).all()
-    return jsonify([{
-        'id': w.id,
-        'workout_type': w.workout_type,
-        'duration': w.duration,
-        'calories_burned': w.calories_burned,
-        'date': w.workout_date.isoformat()
-    } for w in workouts]), 200
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    pagination = Workout.query.filter_by(user_id=user_id) \
+        .order_by(Workout.workout_date.desc()) \
+        .paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'items': [{
+            'id': w.id,
+            'workout_type': w.workout_type,
+            'duration': w.duration,
+            'calories_burned': w.calories_burned,
+            'date': w.workout_date.isoformat()
+        } for w in pagination.items],
+        'page': pagination.page,
+        'per_page': pagination.per_page,
+        'total_pages': pagination.pages,
+        'total_items': pagination.total
+    }), 200
 
 @app.route('/api/foods/search', methods=['GET'])
 @jwt_required()
@@ -125,6 +150,48 @@ def search_foods():
 
     return jsonify(results), 200
 
+@app.route('/api/meals', methods=['GET', 'POST'])
+@jwt_required()
+def meals():
+    user_id = get_jwt_identity()
+
+    if request.method == 'POST':
+        data = request.get_json()
+        entry = Meal(
+            user_id=user_id,
+            food_name=data['food_name'],
+            calories=data.get('calories'),
+            protein=data.get('protein'),
+            carbs=data.get('carbs'),
+            fats=data.get('fats')
+        )
+        db.session.add(entry)
+        db.session.commit()
+        return jsonify({"id": entry.id, "food_name": entry.food_name}), 201
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+
+    pagination = Meal.query.filter_by(user_id=user_id) \
+        .order_by(Meal.meal_date.desc()) \
+        .paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'items': [{
+            "id": m.id,
+            "food_name": m.food_name,
+            "calories": m.calories,
+            "protein": m.protein,
+            "carbs": m.carbs,
+            "fats": m.fats,
+            "date": m.meal_date.isoformat()
+        } for m in pagination.items],
+        'page': pagination.page,
+        'per_page': pagination.per_page,
+        'total_pages': pagination.pages,
+        'total_items': pagination.total
+    }), 200
+    
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
 
